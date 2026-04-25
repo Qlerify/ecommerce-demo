@@ -56,7 +56,14 @@
       "acceptanceCriteria": [
         "Given a cart exists, when the customer updates the cart's email, then the cart is returned with the new email",
         "Given a cart exists, when the customer updates the cart via a matching selector, then the cart is updated",
-        "Given no cart with the given id exists, when the customer updates that id, then the command is rejected with a not-found error"
+        "Given no cart with the given id exists, when the customer updates that id, then the command is rejected with a not-found error",
+        "Given a cart with one line item at unit price 100, quantity 2, and a 20% line-item tax line, when GetCart is queried, then subtotal=200, itemTaxTotal=40, taxTotal=40 and total=240",
+        "Given a cart line item with subtotal 200 and a line-item adjustment of 20, when GetCart is queried, then itemDiscountTotal=20, discountTotal includes 20, and total reflects subtotal minus discounts plus taxes",
+        "Given a cart with a shipping method of amount 50 and a 20% shipping tax line, when GetCart is queried, then shippingSubtotal=50, shippingTaxTotal=10 and shippingTotal=60",
+        "Given a cart with line items contributing taxTotal=40 and shipping methods contributing taxTotal=10, when GetCart is queried, then taxTotal=50",
+        "Given a cart with a credit line of 25, when GetCart is queried, then creditLineTotal=25 and total is reduced by 25",
+        "Given a cart with no line items and no shipping methods, when GetCart is queried, then subtotal=0, taxTotal=0 and total=0",
+        "Given a line item with isTaxInclusive=true, unit price 120 and a 20% tax line, when GetCart is queried, then the line item subtotal=100 and taxTotal=20 (tax extracted from the inclusive price)"
       ]
     },
     "ShippingAddressSet": {
@@ -1515,6 +1522,30 @@
               },
               {
                 "name": "isDiscountable"
+              },
+              {
+                "name": "subtotal",
+                "computed": true
+              },
+              {
+                "name": "total",
+                "computed": true
+              },
+              {
+                "name": "taxTotal",
+                "computed": true
+              },
+              {
+                "name": "discountTotal",
+                "computed": true
+              },
+              {
+                "name": "discountSubtotal",
+                "computed": true
+              },
+              {
+                "name": "discountTaxTotal",
+                "computed": true
               }
             ]
           },
@@ -1541,6 +1572,30 @@
               },
               {
                 "name": "description"
+              },
+              {
+                "name": "subtotal",
+                "computed": true
+              },
+              {
+                "name": "total",
+                "computed": true
+              },
+              {
+                "name": "taxTotal",
+                "computed": true
+              },
+              {
+                "name": "discountTotal",
+                "computed": true
+              },
+              {
+                "name": "discountSubtotal",
+                "computed": true
+              },
+              {
+                "name": "discountTaxTotal",
+                "computed": true
               }
             ]
           },
@@ -1580,6 +1635,66 @@
           },
           {
             "name": "itemCount",
+            "computed": true
+          },
+          {
+            "name": "subtotal",
+            "computed": true
+          },
+          {
+            "name": "taxTotal",
+            "computed": true
+          },
+          {
+            "name": "discountTotal",
+            "computed": true
+          },
+          {
+            "name": "discountSubtotal",
+            "computed": true
+          },
+          {
+            "name": "discountTaxTotal",
+            "computed": true
+          },
+          {
+            "name": "itemTotal",
+            "computed": true
+          },
+          {
+            "name": "itemSubtotal",
+            "computed": true
+          },
+          {
+            "name": "itemTaxTotal",
+            "computed": true
+          },
+          {
+            "name": "itemDiscountTotal",
+            "computed": true
+          },
+          {
+            "name": "shippingTotal",
+            "computed": true
+          },
+          {
+            "name": "shippingSubtotal",
+            "computed": true
+          },
+          {
+            "name": "shippingTaxTotal",
+            "computed": true
+          },
+          {
+            "name": "shippingDiscountTotal",
+            "computed": true
+          },
+          {
+            "name": "creditLineSubtotal",
+            "computed": true
+          },
+          {
+            "name": "creditLineTaxTotal",
             "computed": true
           }
         ]
