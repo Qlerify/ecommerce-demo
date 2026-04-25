@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cart Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    [data-tab-content].hidden { display: none; }
+    .role-customer { background: #dbeafe; color: #1e40af; }
+    .role-automation { background: #fef3c7; color: #92400e; }
+    .role-admin { background: #fae8ff; color: #86198f; }
+    details > summary { cursor: pointer; list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-semibold">Cart Demo</h1>
+        <span class="text-xs text-slate-400">Cart bounded context · Express + SQLite</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs">
+        <span class="px-2 py-1 rounded role-customer">Customer</span>
+        <span class="px-2 py-1 rounded role-automation">Automation</span>
+        <span class="px-2 py-1 rounded role-admin">Admin</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1400px] mx-auto px-6 py-6 grid grid-cols-12 gap-6">
+    <!-- Switcher (full width, top) -->
+    <section class="col-span-12 bg-white rounded-lg border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Carts</h2>
+        <span class="text-xs text-slate-400">ListCarts · ListDeletedCarts</span>
+      </div>
+
+      <div class="flex flex-wrap items-end gap-3 mb-3">
+        <div class="flex items-end gap-2" id="new-cart-form">
+          <div>
+            <label class="text-xs text-slate-500 uppercase block">Currency</label>
+            <select data-field="currencyCode" class="border rounded px-2 py-1 text-sm">
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+              <option value="SEK">SEK</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-slate-500 uppercase block">Email</label>
+            <input data-field="email" placeholder="optional" class="border rounded px-2 py-1 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-500 uppercase block">Locale</label>
+            <input data-field="locale" placeholder="optional" class="border rounded px-2 py-1 text-sm w-24" />
+          </div>
+          <button id="btn-new-cart" class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded hover:bg-emerald-700">+ Create</button>
+        </div>
+
+        <div class="h-8 w-px bg-slate-200 mx-1"></div>
+
+        <div class="flex items-end gap-2">
+          <div>
+            <label class="text-xs text-slate-500 uppercase block">Load by id</label>
+            <input id="load-id" placeholder="cart_..." class="border border-slate-300 rounded px-2 py-1 text-xs font-mono w-48" />
+          </div>
+          <button id="btn-load" class="bg-slate-900 text-white text-sm px-3 py-1.5 rounded hover:bg-slate-700">Load</button>
+        </div>
+
+        <div class="ml-auto flex items-end gap-2">
+          <div>
+            <label class="text-xs text-slate-500 uppercase block">Filter</label>
+            <select id="cart-filter" class="border rounded px-2 py-1 text-sm">
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="deleted">Deleted</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <ul id="cart-list" class="flex flex-nowrap gap-2 overflow-x-auto pb-1 -mx-1 px-1"></ul>
+    </section>
+
+    <!-- Catalog -->
+    <section class="col-span-3 bg-white rounded-lg border border-slate-200 p-4 self-start">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Catalog</h2>
+        <span class="text-xs text-slate-400">GetProductCatalog</span>
+      </div>
+      <ul id="catalog" class="space-y-2"></ul>
+    </section>
+
+    <!-- Cart -->
+    <section class="col-span-9 bg-white rounded-lg border border-slate-200 self-start">
+      <!-- Cart header -->
+      <div id="cart-header" class="border-b border-slate-200 p-4">
+        <div id="cart-empty" class="text-slate-400 text-sm">No cart loaded. Use the bar above to create or load one.</div>
+        <div id="cart-meta" class="hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400">Cart</div>
+              <div class="font-mono text-sm" id="active-cart-id">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">Currency</div>
+              <div class="text-sm font-medium uppercase" id="active-cart-ccy">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">Status</div>
+              <div class="text-sm" id="active-cart-status">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">Created</div>
+              <div class="text-sm" id="active-cart-created">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">Updated</div>
+              <div class="text-sm" id="active-cart-updated">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <nav id="tab-bar" class="hidden border-b border-slate-200 grid grid-cols-7 text-sm">
+        <button data-tab="items" class="px-3 py-2 border-b-2 border-slate-900 font-medium">Items</button>
+        <button data-tab="addresses" class="px-3 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">Addresses</button>
+        <button data-tab="shipping" class="px-3 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">Shipping</button>
+        <button data-tab="credits" class="px-3 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">Credits</button>
+        <button data-tab="tax" class="px-3 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">Tax &amp; Discounts</button>
+        <button data-tab="settings" class="px-3 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">Settings</button>
+        <button data-tab="raw" class="px-3 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">Raw</button>
+      </nav>
+
+      <!-- Tab contents -->
+      <div id="tab-items" data-tab-content class="p-4">
+        <h3 class="text-xs font-semibold uppercase text-slate-500 mb-2">Line items</h3>
+        <ul id="line-items" class="divide-y divide-slate-100"></ul>
+
+        <details class="mt-4 border border-slate-200 rounded p-3">
+          <summary class="text-sm font-medium flex items-center justify-between">
+            Add custom line item
+            <span class="text-xs text-slate-400">AddLineItem</span>
+          </summary>
+          <div class="grid grid-cols-2 gap-2 mt-3 text-sm" id="custom-li-form">
+            <input data-field="title" placeholder="Title*" class="border rounded px-2 py-1 col-span-2" />
+            <input data-field="quantity" type="number" min="1" value="1" placeholder="Quantity*" class="border rounded px-2 py-1" />
+            <input data-field="unitPrice" type="number" step="0.01" value="9.99" placeholder="Unit price*" class="border rounded px-2 py-1" />
+            <input data-field="subtitle" placeholder="Subtitle" class="border rounded px-2 py-1" />
+            <input data-field="thumbnail" placeholder="Thumbnail URL" class="border rounded px-2 py-1" />
+            <input data-field="variantSku" placeholder="Variant SKU" class="border rounded px-2 py-1" />
+            <input data-field="compareAtUnitPrice" type="number" step="0.01" placeholder="Compare-at price" class="border rounded px-2 py-1" />
+            <label class="flex items-center gap-2 col-span-2 text-xs">
+              <input type="checkbox" data-field="isGiftcard" /> isGiftcard
+              <input type="checkbox" data-field="isDiscountable" checked class="ml-3" /> isDiscountable
+              <input type="checkbox" data-field="isTaxInclusive" class="ml-3" /> isTaxInclusive
+              <input type="checkbox" data-field="requiresShipping" checked class="ml-3" /> requiresShipping
+            </label>
+            <button id="btn-add-custom-li" class="col-span-2 bg-slate-900 text-white text-sm px-3 py-2 rounded hover:bg-slate-700">Add line item</button>
+          </div>
+        </details>
+      </div>
+
+      <div id="tab-addresses" data-tab-content class="p-4 hidden">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="border border-slate-200 rounded p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-semibold uppercase text-slate-500">Shipping address</h3>
+              <span class="text-xs text-slate-400">SetShippingAddress</span>
+            </div>
+            <form id="form-shipping-address" class="space-y-1 text-sm"></form>
+          </div>
+          <div class="border border-slate-200 rounded p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-semibold uppercase text-slate-500">Billing address</h3>
+              <span class="text-xs text-slate-400">SetBillingAddress</span>
+            </div>
+            <form id="form-billing-address" class="space-y-1 text-sm"></form>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-shipping" data-tab-content class="p-4 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-semibold uppercase text-slate-500">Active shipping methods</h3>
+          <span class="text-xs text-slate-400">AddShippingMethod / RemoveShippingMethod</span>
+        </div>
+        <ul id="shipping-methods" class="space-y-2 mb-4"></ul>
+
+        <details open class="border border-slate-200 rounded p-3">
+          <summary class="text-sm font-medium">Add from shipping options</summary>
+          <div class="mt-2 flex items-center gap-2">
+            <select id="region-filter" class="border rounded px-2 py-1 text-xs">
+              <option value="">All regions</option>
+              <option value="reg_eu">reg_eu</option>
+              <option value="reg_us">reg_us</option>
+              <option value="reg_uk">reg_uk</option>
+            </select>
+            <select id="shipping-option" class="border rounded px-2 py-1 text-sm flex-1"></select>
+            <button id="btn-add-shipping" class="bg-slate-900 text-white text-sm px-3 py-1 rounded hover:bg-slate-700">Add</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">GetAvailableShippingOptions</div>
+        </details>
+
+        <details class="mt-3 border border-slate-200 rounded p-3">
+          <summary class="text-sm font-medium">Add custom shipping method</summary>
+          <div class="grid grid-cols-2 gap-2 mt-2 text-sm" id="custom-sm-form">
+            <input data-field="name" placeholder="Name*" class="border rounded px-2 py-1" />
+            <input data-field="amount" type="number" step="0.01" placeholder="Amount*" class="border rounded px-2 py-1" />
+            <input data-field="shippingOptionId" placeholder="shippingOptionId (optional)" class="border rounded px-2 py-1 col-span-2" />
+            <label class="flex items-center gap-2 col-span-2 text-xs">
+              <input type="checkbox" data-field="isTaxInclusive" /> isTaxInclusive
+            </label>
+            <button id="btn-add-custom-sm" class="col-span-2 bg-slate-900 text-white text-sm px-3 py-2 rounded hover:bg-slate-700">Add shipping method</button>
+          </div>
+        </details>
+      </div>
+
+      <div id="tab-credits" data-tab-content class="p-4 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-semibold uppercase text-slate-500">Credit lines</h3>
+          <span class="text-xs text-slate-400 role-automation px-1.5 py-0.5 rounded">AddCreditLine · Automation</span>
+        </div>
+        <ul id="credit-lines" class="space-y-2 mb-4"></ul>
+
+        <details open class="border border-slate-200 rounded p-3">
+          <summary class="text-sm font-medium">Add from external credit sources</summary>
+          <div class="mt-2 flex items-center gap-2">
+            <input id="customer-filter" placeholder="Filter by customerId" class="border rounded px-2 py-1 text-xs" />
+            <select id="credit-source" class="border rounded px-2 py-1 text-sm flex-1"></select>
+            <button id="btn-add-credit" class="bg-slate-900 text-white text-sm px-3 py-1 rounded hover:bg-slate-700">Add</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">GetExternalCreditSources</div>
+        </details>
+
+        <details class="mt-3 border border-slate-200 rounded p-3">
+          <summary class="text-sm font-medium">Add custom credit line</summary>
+          <div class="grid grid-cols-2 gap-2 mt-2 text-sm" id="custom-cl-form">
+            <input data-field="amount" type="number" step="0.01" value="10" placeholder="Amount*" class="border rounded px-2 py-1" />
+            <input data-field="reference" placeholder="reference (e.g. refund)" class="border rounded px-2 py-1" />
+            <input data-field="referenceId" placeholder="referenceId" class="border rounded px-2 py-1 col-span-2" />
+            <button id="btn-add-custom-cl" class="col-span-2 bg-slate-900 text-white text-sm px-3 py-2 rounded hover:bg-slate-700">Add credit line</button>
+          </div>
+        </details>
+      </div>
+
+      <div id="tab-tax" data-tab-content class="p-4 hidden">
+        <div class="mb-3 text-xs text-slate-500">
+          Set-replace semantics: editing replaces the full collection on each item/method. Existing rows kept by id, omitted rows deleted, new rows inserted.
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-semibold uppercase text-slate-500">Line item tax &amp; discounts</h3>
+          <span class="text-xs text-slate-400 role-automation px-1.5 py-0.5 rounded">Automation</span>
+        </div>
+        <div id="li-tax-list" class="space-y-3 mb-6"></div>
+
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-semibold uppercase text-slate-500">Shipping method tax &amp; discounts</h3>
+          <span class="text-xs text-slate-400 role-automation px-1.5 py-0.5 rounded">Automation</span>
+        </div>
+        <div id="sm-tax-list" class="space-y-3"></div>
+      </div>
+
+      <div id="tab-settings" data-tab-content class="p-4 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-semibold uppercase text-slate-500">Cart settings</h3>
+          <span class="text-xs text-slate-400">UpdateCart</span>
+        </div>
+        <form id="form-cart-settings" class="grid grid-cols-2 gap-2 text-sm">
+          <input data-field="email" placeholder="email" class="border rounded px-2 py-1" />
+          <input data-field="locale" placeholder="locale (e.g. en-US)" class="border rounded px-2 py-1" />
+          <input data-field="customerId" placeholder="customerId" class="border rounded px-2 py-1" />
+          <input data-field="regionId" placeholder="regionId" class="border rounded px-2 py-1" />
+          <input data-field="salesChannelId" placeholder="salesChannelId" class="border rounded px-2 py-1 col-span-2" />
+          <textarea data-field="metadata" rows="3" placeholder='metadata JSON (e.g. {"source":"web"})' class="border rounded px-2 py-1 col-span-2 font-mono text-xs"></textarea>
+          <button type="submit" class="col-span-2 bg-slate-900 text-white text-sm px-3 py-2 rounded hover:bg-slate-700">Save settings</button>
+        </form>
+
+        <div class="mt-6 border-t border-slate-200 pt-4 flex items-center justify-between">
+          <div>
+            <div class="text-xs font-semibold uppercase text-slate-500">Lifecycle</div>
+            <div class="text-xs text-slate-400">Soft-delete cascades to items, shipping methods, credit lines, addresses.</div>
+          </div>
+          <div class="flex gap-2">
+            <button id="btn-delete-cart" class="text-xs bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700">Delete cart</button>
+            <button id="btn-restore-cart" class="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700 hidden">Restore cart</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-raw" data-tab-content class="p-4 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-semibold uppercase text-slate-500">Raw cart JSON</h3>
+          <span class="text-xs text-slate-400">GetCart</span>
+        </div>
+        <pre id="raw-cart" class="text-xs bg-slate-900 text-slate-100 p-3 rounded overflow-auto max-h-[600px] font-mono"></pre>
+      </div>
+
+      <!-- Sticky totals -->
+      <div id="totals-bar" class="hidden border-t border-slate-200 bg-slate-50 px-4 py-3 grid grid-cols-4 gap-4 text-sm rounded-b-lg">
+        <div><div class="text-xs text-slate-500 uppercase">Items</div><div class="font-medium" id="totals-items">—</div></div>
+        <div><div class="text-xs text-slate-500 uppercase">Shipping</div><div class="font-medium" id="totals-shipping">—</div></div>
+        <div><div class="text-xs text-slate-500 uppercase">Credits</div><div class="font-medium" id="totals-credits">—</div></div>
+        <div><div class="text-xs text-slate-500 uppercase">Total</div><div class="font-semibold text-base" id="totals-grand">—</div></div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="fixed bottom-4 right-4 hidden text-white text-sm px-4 py-2 rounded shadow"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
