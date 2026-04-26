@@ -44,34 +44,36 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
     .whereNull('deleted_at')
     .orderBy('id');
 
-  const lineItemDtos = lineItems.map((li) => ({
-    id: li.id,
-    title: li.title,
-    quantity: Number(li.quantity),
-    unitPrice: Number(li.unit_price),
-    subtitle: li.subtitle,
-    thumbnail: li.thumbnail,
-    variantId: li.variant_id,
-    productId: li.product_id,
-    productTitle: li.product_title,
-    productDescription: li.product_description,
-    productSubtitle: li.product_subtitle,
-    productType: li.product_type,
-    productTypeId: li.product_type_id,
-    productCollection: li.product_collection,
-    productHandle: li.product_handle,
-    variantSku: li.variant_sku,
-    variantBarcode: li.variant_barcode,
-    variantTitle: li.variant_title,
-    variantOptionValues: jsonParse(li.variant_option_values),
-    requiresShipping: li.requires_shipping == null ? null : !!li.requires_shipping,
-    isDiscountable: li.is_discountable == null ? null : !!li.is_discountable,
-    isGiftcard: li.is_giftcard == null ? null : !!li.is_giftcard,
-    isTaxInclusive: li.is_tax_inclusive == null ? null : !!li.is_tax_inclusive,
-    isCustomPrice: li.is_custom_price == null ? null : !!li.is_custom_price,
-    compareAtUnitPrice: li.compare_at_unit_price == null ? null : Number(li.compare_at_unit_price),
-    metadata: jsonParse(li.metadata),
-    taxLines: taxLines
+  const round = (n: number) => Math.round(n * 100) / 100;
+
+  const computeTaxedTotals = (gross: number, rateSum: number, isInclusive: boolean, discountSubtotal: number) => {
+    let subtotal: number;
+    let taxTotal: number;
+    if (isInclusive && rateSum > 0) {
+      taxTotal = gross * (rateSum / (1 + rateSum));
+      subtotal = gross - taxTotal;
+    } else {
+      subtotal = gross;
+      taxTotal = subtotal * rateSum;
+    }
+    const discountTaxTotal = discountSubtotal * rateSum;
+    const discountTotal = discountSubtotal + discountTaxTotal;
+    const total = subtotal + taxTotal - discountTotal;
+    return {
+      subtotal: round(subtotal),
+      taxTotal: round(taxTotal),
+      discountSubtotal: round(discountSubtotal),
+      discountTaxTotal: round(discountTaxTotal),
+      discountTotal: round(discountTotal),
+      total: round(total),
+    };
+  };
+
+  const lineItemDtos = lineItems.map((li) => {
+    const quantity = Number(li.quantity);
+    const unitPrice = Number(li.unit_price);
+    const isTaxInclusive = li.is_tax_inclusive == null ? null : !!li.is_tax_inclusive;
+    const liTaxLines = taxLines
       .filter((t) => t.line_item_id === li.id)
       .map((t) => ({
         id: t.id,
@@ -81,8 +83,8 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
         providerId: t.provider_id,
         taxRateId: t.tax_rate_id,
         metadata: jsonParse(t.metadata),
-      })),
-    adjustments: adjustments
+      }));
+    const liAdjustments = adjustments
       .filter((a) => a.line_item_id === li.id)
       .map((a) => ({
         id: a.id,
@@ -93,19 +95,47 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
         providerId: a.provider_id,
         isTaxInclusive: a.is_tax_inclusive == null ? null : !!a.is_tax_inclusive,
         metadata: jsonParse(a.metadata),
-      })),
-  }));
+      }));
+    const rateSum = liTaxLines.reduce((s, t) => s + t.rate, 0) / 100;
+    const discountSubtotal = liAdjustments.reduce((s, a) => s + a.amount, 0);
+    const totals = computeTaxedTotals(quantity * unitPrice, rateSum, !!isTaxInclusive, discountSubtotal);
+    return {
+      id: li.id,
+      title: li.title,
+      quantity,
+      unitPrice,
+      subtitle: li.subtitle,
+      thumbnail: li.thumbnail,
+      variantId: li.variant_id,
+      productId: li.product_id,
+      productTitle: li.product_title,
+      productDescription: li.product_description,
+      productSubtitle: li.product_subtitle,
+      productType: li.product_type,
+      productTypeId: li.product_type_id,
+      productCollection: li.product_collection,
+      productHandle: li.product_handle,
+      variantSku: li.variant_sku,
+      variantBarcode: li.variant_barcode,
+      variantTitle: li.variant_title,
+      variantOptionValues: jsonParse(li.variant_option_values),
+      requiresShipping: li.requires_shipping == null ? null : !!li.requires_shipping,
+      isDiscountable: li.is_discountable == null ? null : !!li.is_discountable,
+      isGiftcard: li.is_giftcard == null ? null : !!li.is_giftcard,
+      isTaxInclusive,
+      isCustomPrice: li.is_custom_price == null ? null : !!li.is_custom_price,
+      compareAtUnitPrice: li.compare_at_unit_price == null ? null : Number(li.compare_at_unit_price),
+      metadata: jsonParse(li.metadata),
+      taxLines: liTaxLines,
+      adjustments: liAdjustments,
+      ...totals,
+    };
+  });
 
-  const shippingMethodDtos = shippingMethods.map((sm) => ({
-    id: sm.id,
-    name: sm.name,
-    amount: Number(sm.amount),
-    description: jsonParse(sm.description),
-    shippingOptionId: sm.shipping_option_id,
-    data: jsonParse(sm.data),
-    isTaxInclusive: sm.is_tax_inclusive == null ? null : !!sm.is_tax_inclusive,
-    metadata: jsonParse(sm.metadata),
-    taxLines: smTaxLines
+  const shippingMethodDtos = shippingMethods.map((sm) => {
+    const amount = Number(sm.amount);
+    const isTaxInclusive = sm.is_tax_inclusive == null ? null : !!sm.is_tax_inclusive;
+    const smTax = smTaxLines
       .filter((t) => t.shipping_method_id === sm.id)
       .map((t) => ({
         id: t.id,
@@ -115,8 +145,8 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
         providerId: t.provider_id,
         taxRateId: t.tax_rate_id,
         metadata: jsonParse(t.metadata),
-      })),
-    adjustments: smAdjustments
+      }));
+    const smAdj = smAdjustments
       .filter((a) => a.shipping_method_id === sm.id)
       .map((a) => ({
         id: a.id,
@@ -126,8 +156,24 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
         promotionId: a.promotion_id,
         providerId: a.provider_id,
         metadata: jsonParse(a.metadata),
-      })),
-  }));
+      }));
+    const rateSum = smTax.reduce((s, t) => s + t.rate, 0) / 100;
+    const discountSubtotal = smAdj.reduce((s, a) => s + a.amount, 0);
+    const totals = computeTaxedTotals(amount, rateSum, !!isTaxInclusive, discountSubtotal);
+    return {
+      id: sm.id,
+      name: sm.name,
+      amount,
+      description: jsonParse(sm.description),
+      shippingOptionId: sm.shipping_option_id,
+      data: jsonParse(sm.data),
+      isTaxInclusive,
+      metadata: jsonParse(sm.metadata),
+      taxLines: smTax,
+      adjustments: smAdj,
+      ...totals,
+    };
+  });
 
   const creditLineDtos = creditLines.map((c) => ({
     id: c.id,
@@ -137,16 +183,30 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
     metadata: jsonParse(c.metadata),
   }));
 
-  const itemsTotal = lineItemDtos.reduce(
-    (sum, li) => sum + li.quantity * li.unitPrice - (li.adjustments.reduce((a, x) => a + x.amount, 0)),
-    0,
-  );
-  const shippingTotal = shippingMethodDtos.reduce(
-    (sum, sm) => sum + sm.amount - sm.adjustments.reduce((a, x) => a + x.amount, 0),
-    0,
-  );
-  const creditLineTotal = creditLineDtos.reduce((sum, c) => sum + c.amount, 0);
-  const total = itemsTotal + shippingTotal - creditLineTotal;
+  const itemSubtotal = lineItemDtos.reduce((s, li) => s + li.subtotal, 0);
+  const itemTaxTotal = lineItemDtos.reduce((s, li) => s + li.taxTotal, 0);
+  const itemDiscountSubtotal = lineItemDtos.reduce((s, li) => s + li.discountSubtotal, 0);
+  const itemDiscountTaxTotal = lineItemDtos.reduce((s, li) => s + li.discountTaxTotal, 0);
+  const itemDiscountTotal = lineItemDtos.reduce((s, li) => s + li.discountTotal, 0);
+  const itemTotal = lineItemDtos.reduce((s, li) => s + li.total, 0);
+
+  const shippingSubtotal = shippingMethodDtos.reduce((s, sm) => s + sm.subtotal, 0);
+  const shippingTaxTotal = shippingMethodDtos.reduce((s, sm) => s + sm.taxTotal, 0);
+  const shippingDiscountSubtotal = shippingMethodDtos.reduce((s, sm) => s + sm.discountSubtotal, 0);
+  const shippingDiscountTaxTotal = shippingMethodDtos.reduce((s, sm) => s + sm.discountTaxTotal, 0);
+  const shippingDiscountTotal = shippingMethodDtos.reduce((s, sm) => s + sm.discountTotal, 0);
+  const shippingTotal = shippingMethodDtos.reduce((s, sm) => s + sm.total, 0);
+
+  const creditLineSubtotal = creditLineDtos.reduce((s, c) => s + c.amount, 0);
+  const creditLineTaxTotal = 0;
+  const creditLineTotal = creditLineSubtotal + creditLineTaxTotal;
+
+  const subtotal = itemSubtotal + shippingSubtotal;
+  const taxTotal = itemTaxTotal + shippingTaxTotal;
+  const discountSubtotal = itemDiscountSubtotal + shippingDiscountSubtotal;
+  const discountTaxTotal = itemDiscountTaxTotal + shippingDiscountTaxTotal;
+  const discountTotal = itemDiscountTotal + shippingDiscountTotal;
+  const total = subtotal + taxTotal - discountTotal - creditLineTotal;
   const itemCount = lineItemDtos.reduce((sum, li) => sum + li.quantity, 0);
 
   return {
@@ -167,8 +227,23 @@ export async function getCart(db: Knex, cartId: string, opts: { includeDeleted?:
     lineItems: lineItemDtos,
     shippingMethods: shippingMethodDtos,
     creditLines: creditLineDtos,
-    creditLineTotal,
-    total: Math.round(total * 100) / 100,
     itemCount,
+    subtotal: round(subtotal),
+    taxTotal: round(taxTotal),
+    discountSubtotal: round(discountSubtotal),
+    discountTaxTotal: round(discountTaxTotal),
+    discountTotal: round(discountTotal),
+    itemSubtotal: round(itemSubtotal),
+    itemTaxTotal: round(itemTaxTotal),
+    itemDiscountTotal: round(itemDiscountTotal),
+    itemTotal: round(itemTotal),
+    shippingSubtotal: round(shippingSubtotal),
+    shippingTaxTotal: round(shippingTaxTotal),
+    shippingDiscountTotal: round(shippingDiscountTotal),
+    shippingTotal: round(shippingTotal),
+    creditLineSubtotal: round(creditLineSubtotal),
+    creditLineTaxTotal: round(creditLineTaxTotal),
+    creditLineTotal: round(creditLineTotal),
+    total: round(total),
   };
 }

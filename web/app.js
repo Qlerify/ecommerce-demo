@@ -687,16 +687,11 @@ function renderRaw() {
 
 function renderTotals() {
   const c = state.cart;
-  const itemsSubtotal = c.lineItems.reduce(
-    (s, li) => s + li.quantity * li.unitPrice - li.adjustments.reduce((a, x) => a + x.amount, 0),
-    0,
-  );
-  const shippingSubtotal = c.shippingMethods.reduce(
-    (s, sm) => s + sm.amount - sm.adjustments.reduce((a, x) => a + x.amount, 0),
-    0,
-  );
-  $('totals-items').textContent = fmt(itemsSubtotal, c.currencyCode);
-  $('totals-shipping').textContent = fmt(shippingSubtotal, c.currencyCode);
+  $('totals-items').textContent = fmt(c.itemTotal, c.currencyCode);
+  $('totals-shipping').textContent = fmt(c.shippingTotal, c.currencyCode);
+  $('totals-subtotal').textContent = fmt(c.subtotal, c.currencyCode);
+  $('totals-tax').textContent = fmt(c.taxTotal, c.currencyCode);
+  $('totals-discount').textContent = fmt(c.discountTotal, c.currencyCode);
   $('totals-credits').textContent = fmt(c.creditLineTotal, c.currencyCode);
   $('totals-grand').textContent = fmt(c.total, c.currencyCode);
 }
