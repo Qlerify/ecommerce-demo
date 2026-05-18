@@ -1,0 +1,157 @@
+{
+  "$schema": "https://app.qlerify.com/schemas/domain-model/v1.json",
+  "version": 1,
+  "projectId": "0cbc80c0-a79b-4920-90db-c6e7d9077e04",
+  "workflowId": "75d19947-1b0a-4e4b-a8dd-570862681788",
+  "workflowName": "Medusa Cart",
+  "boundedContext": "Cart",
+  "roles": ["Customer", "Automation"],
+  "domainEvents": {
+    "CartCreated": {
+      "event": "Cart Created",
+      "role": "Customer",
+      "command": "CreateCart",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given no carts exist, When createCarts is called with currency_code 'eur', Then a cart is created with currency_code 'eur' and an auto-generated id",
+        "Given currency_code is omitted, When createCarts is called, Then an error is thrown: Value for Cart.currency_code is required",
+        "Given inline shipping_address and billing_address objects, When the cart is created, Then both addresses are persisted and linked to the cart",
+        "Given an existing Address record, When createCarts is called with shipping_address_id and billing_address_id, Then the cart is linked to the existing address",
+        "Given inline items on create, When the cart is retrieved with the items relation, Then the items appear on the cart"
+      ]
+    },
+    "LineItemsAdded": {
+      "event": "Line Items Added",
+      "role": "Customer",
+      "command": "AddLineItems",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given an existing cart, When addLineItems is called with a line item, Then the item appears on the cart",
+        "Given a non-existent cart id, When addLineItems is called, Then an error is thrown: Cart with id was not found",
+        "Given quantity is omitted from the line item, When addLineItems is called, Then an error is thrown: Value for LineItem.quantity is required"
+      ]
+    },
+    "LineItemsUpdated": {
+      "event": "Line Items Updated",
+      "role": "Customer",
+      "command": "UpdateLineItems",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given an existing item on a cart, When updateLineItems is called by direct id, Then matching items are updated",
+        "Given multiple items, When updateLineItems is called, Then all matching items are updated according to their respective data"
+      ]
+    },
+    "LineItemsRemoved": {
+      "event": "Line Items Removed",
+      "role": "Customer",
+      "command": "RemoveLineItems",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given items on a cart, When softDeleteLineItems is called with their ids, Then the cart's items collection is empty",
+        "Given a line item is removed, When the cart is retrieved, Then the item's adjustments and tax lines are also removed (cascade)"
+      ]
+    },
+    "CartUpdated": {
+      "event": "Cart Updated",
+      "role": "Customer",
+      "command": "UpdateCart",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given a non-existent cart id, When updateCarts is called, Then an error is thrown: Cart with id not found",
+        "Given an existing cart, When updateCarts is called with id and email, Then the cart email is updated"
+      ]
+    },
+    "ShippingMethodAdded": {
+      "event": "Shipping Method Added",
+      "role": "Customer",
+      "command": "AddShippingMethod",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given an existing cart, When addShippingMethods is called with a method of amount 100, Then the method appears on the cart",
+        "Given an amount of -100, When addShippingMethods is called, Then a CheckConstraintViolationException is thrown"
+      ]
+    },
+    "ShippingMethodUpdated": {
+      "event": "Shipping Method Updated",
+      "role": "Customer",
+      "command": "UpdateShippingMethod",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given an existing shipping method on a cart, When updateShippingMethods is called with new name, amount, or data, Then the method is updated"
+      ]
+    },
+    "ShippingMethodRemoved": {
+      "event": "Shipping Method Removed",
+      "role": "Customer",
+      "command": "RemoveShippingMethod",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given a shipping method on a cart, When softDeleteShippingMethods is called, Then the cart's shipping_methods collection is empty",
+        "Given a shipping method is removed, When the cart is retrieved, Then the method's adjustments and tax lines are also removed (cascade)"
+      ]
+    },
+    "LineItemAdjustmentsSet": {
+      "event": "Line Item Adjustments Set",
+      "role": "Automation",
+      "command": "SetLineItemAdjustments",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given two line items on a cart, When setLineItemAdjustments is called with two adjustments, Then both adjustments are created",
+        "Given an existing adjustment, When setLineItemAdjustments is called without that id, Then the old adjustment is deleted and the new one is created (replace semantics)",
+        "Given existing adjustments, When setLineItemAdjustments is called with an empty array, Then all adjustments are removed",
+        "Given an existing adjustment, When setLineItemAdjustments is called with the existing id and a new amount, Then the adjustment is updated in place"
+      ]
+    },
+    "ShippingMethodAdjustmentsSet": {
+      "event": "Shipping Method Adjustments Set",
+      "role": "Automation",
+      "command": "SetShippingMethodAdjustments",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given existing shipping method adjustments, When setShippingMethodAdjustments is called, Then unlisted adjustments are deleted and listed ones are upserted in one transaction"
+      ]
+    },
+    "LineItemTaxLinesSet": {
+      "event": "Line Item Tax Lines Set",
+      "role": "Automation",
+      "command": "SetLineItemTaxLines",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given two items on a cart, When setLineItemTaxLines is called with one tax line per item, Then tax lines are created on both items",
+        "Given existing tax lines, When setLineItemTaxLines is called without their ids, Then they are deleted and the new ones are created",
+        "Given existing tax lines, When setLineItemTaxLines is called with an empty array, Then all tax lines are removed",
+        "Given an existing tax line id with a new rate, When setLineItemTaxLines is called, Then the rate is updated in place"
+      ]
+    },
+    "ShippingMethodTaxLinesSet": {
+      "event": "Shipping Method Tax Lines Set",
+      "role": "Automation",
+      "command": "SetShippingMethodTaxLines",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given shipping methods on a cart, When setShippingMethodTaxLines is called, Then existing tax lines are atomically replaced with the new set (delete unlisted, upsert listed)"
+      ]
+    },
+    "CreditLinesUpdated": {
+      "event": "Credit Lines Updated",
+      "role": "Automation",
+      "command": "ManageCreditLines",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given a cart, When createCreditLines is called with an amount and external reference, Then a credit line is added to the cart",
+        "Given an existing credit line, When updateCreditLines is called, Then the credit line is updated",
+        "Given an existing credit line, When deleteCreditLines is called, Then the credit line is removed"
+      ]
+    },
+    "CartDeleted": {
+      "event": "Cart Deleted",
+      "role": "Automation",
+      "command": "DeleteCart",
+      "aggregateRoot": "Cart",
+      "acceptanceCriteria": [
+        "Given an existing cart, When deleteCarts is called, Then the cart no longer appears in listCarts",
+        "Given a cart is deleted, Then its items, shipping methods, shipping_address, and billing_address are cascade-deleted"
+      ]
+    }
+  }
+}

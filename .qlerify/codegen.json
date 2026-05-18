@@ -1,0 +1,39 @@
+{
+  "workflowId": "75d19947-1b0a-4e4b-a8dd-570862681788",
+  "projectId": "0cbc80c0-a79b-4920-90db-c6e7d9077e04",
+  "workflowName": "Medusa Cart",
+  "modelHash": "6091ba48897f854a3086e3af26c908613f2fc13cc0437cc1e9169f2cf086a6a2",
+  "generatedAt": "2026-05-15T00:00:00Z",
+  "stack": {
+    "runtime": "node",
+    "language": "typescript",
+    "server": {
+      "framework": "fastify",
+      "orm": "drizzle",
+      "database": "postgres",
+      "databaseDriver": "pglite",
+      "testRunner": "vitest"
+    },
+    "client": {
+      "framework": "react",
+      "bundler": "vite",
+      "styling": "tailwind"
+    },
+    "packageManager": "pnpm"
+  },
+  "boundedContexts": [
+    {
+      "name": "Cart",
+      "aggregates": ["Cart"]
+    }
+  ],
+  "persistenceDecisions": [
+    "Address VO embedded inline on Cart row as columns prefixed with shipping_/billing_. Cascade-deleted with Cart.",
+    "LineItem and ShippingMethod stored as separate tables (entities with independent lifecycle). FK to cart with ON DELETE CASCADE.",
+    "CreditLine stored as separate table (entity with independent lifecycle). FK to cart with ON DELETE CASCADE.",
+    "LineItemAdjustment, LineItemTaxLine, ShippingMethodAdjustment, ShippingMethodTaxLine stored as separate tables (set-replace semantics need addressable rows). FK to parent with ON DELETE CASCADE.",
+    "Cart row carries integer 'version' column for optimistic concurrency control. Bumped on every command commit.",
+    "Storage engine: PGlite (in-process Postgres, no external server needed) for zero-friction local development. Drop-in replacement for hosted Postgres in production by swapping the DATABASE_URL."
+  ],
+  "authNote": "Auth middleware reads role from x-role header. Pluggable: swap for JWT/session middleware before deploying."
+}
